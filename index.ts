@@ -42,7 +42,7 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 const question = (text: string) => new Promise<string>((resolve) => rl.question(text, resolve))
 
 // start a connection
-const startSock = async() => {
+const App = async() => {
 	const { state, saveCreds } = await useMultiFileAuthState('baileys_auth_info')
 	// fetch latest version of WA Web
 	const { version, isLatest } = await fetchLatestBaileysVersion()
@@ -105,7 +105,7 @@ const startSock = async() => {
 				if(connection === 'close') {
 					// reconnect if not logged out
 					if((lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut) {
-						startSock()
+						App()
 					} else {
 						console.log('Connection closed. You are logged out.')
 					}
@@ -257,4 +257,4 @@ const startSock = async() => {
 	}
 }
 
-startSock()
+App()
