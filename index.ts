@@ -167,7 +167,10 @@ const startSock = async() => {
               }
 
               if (text == "menu") {
-               await sendMessageWTyping({ image: { url: 'https://raw.githubusercontent.com/naylor-lab/Zenkai-Ethernal-whatsapp.default/refs/heads/main/Files/Menu/homeMenu.jpg'}, caption: '> Menu:\n\n/Manager\n/Services\n/Help\'}, msg.key.remoteJid!) 
+               await sendMessageWTyping(
+				   { image: 
+				   {  url: 'https://raw.githubusercontent.com/naylor-lab/Zenkai-Ethernal-whatsapp.default/refs/heads/main/Files/Menu/homeMenu.jpg'},
+					 caption: "> Menu:\n\n/Manager\n/Services\n/Help\", msg.key.remoteJid!) 
 	      } 
 
               if (!msg.key.fromMe && doReplies && !isJidNewsletter(msg.key?.remoteJid!)) {
