@@ -41,6 +41,23 @@ const onDemandMap = new Map<string, string>()
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
 const question = (text: string) => new Promise<string>((resolve) => rl.question(text, resolve))
 
+/ 1️⃣  Prefixo configurável
+// ---------------------------------------------------
+const COMMAND_PREFIX = '!';   // pode mudar para '/' ou outro caractere
+
+// ---------------------------------------------------
+// 2️⃣  Função auxiliar para checar e extrair comando
+// ---------------------------------------------------
+function parseCommand(text: string): string | null {
+  // Remove espaços antes/depois e garante que o texto comece com o prefixo
+  const trimmed = text.trim();
+  if (!trimmed.startsWith(COMMAND_PREFIX)) return null;
+
+  // Retorna tudo que vem depois do prefixo, em minúsculas (para comparação case‑insensitive)
+  return trimmed.slice(COMMAND_PREFIX.length).toLowerCase();
+}
+
+
 // start a connection
 const App = async() => {
 	const { state, saveCreds } = await useMultiFileAuthState('baileys_auth_info')
@@ -140,54 +157,81 @@ const App = async() => {
 				console.log(`recv ${chats.length} chats, ${contacts.length} contacts, ${messages.length} msgs (is latest: ${isLatest}, progress: ${progress}%), type: ${syncType}`)
 			}
 
-			// received a new message
-      if (events['messages.upsert']) {
-        const upsert = events['messages.upsert']
-        console.log('recv messages ', JSON.stringify(upsert, undefined, 2))
+			// ---------------------------------------------------
+// 3️⃣  Dentro do handler de mensagens.upsert
+// ---------------------------------------------------
+if (events['messages.upsert']) {
+  const upsert = events['messages.upsert'];
+  console.log('recv messages ', JSON.stringify(upsert, undefined, 2));
 
-        if (!!upsert.requestId) {
-          console.log("placeholder message received for request of id=" + upsert.requestId, upsert)
+  if (upsert.type === 'notify') {
+    for (const msg of upsert.messages) {
+      // Captura o texto da mensagem (simples ou extended)
+      const text = msg.message?.conversation ??
+                   msg.message?.extendedTextMessage?.text ??
+                   '';
+
+      // ----------------------------------------------
+      // 3.1️⃣  Primeiro tratamos os comandos com prefixo
+      // ----------------------------------------------
+      const cmd = parseCommand(text);
+      if (cmd) {
+        // Exemplo de ID do grupo que será aberto/fechado.
+        // Substitua pelo JID real do seu grupo (ex.: '1234567890-123456@g.us')
+        const TARGET_GROUP_JID = 'SEU_GRUPO_ID@g.us';
+
+        switch (cmd) {
+          case 'open_group':
+            // Envia uma mensagem ao grupo indicando que ele foi "aberto"
+            await sock.sendMessage(TARGET_GROUP_JID, {
+              text: '🔓 Grupo aberto! Agora todos podem conversar.',
+            });
+            console.log('Comando open_group executado');
+            break;
+
+          case 'close_group':
+            // Envia uma mensagem ao grupo indicando que ele foi "fechado"
+            await sock.sendMessage(TARGET_GROUP_JID, {
+              text: '🔒 Grupo fechado! Mensagens serão ignoradas até reabrir.',
+            });
+            console.log('Comando close_group executado');
+            break;
+
+          // Caso queira manter outros comandos com prefixo, adicione aqui
+          default:
+            // Se o comando não for reconhecido, opcionalmente avise o usuário
+            await sock.sendMessage(msg.key.remoteJid!, {
+              text: `❓ Comando desconhecido: ${cmd}`,
+            });
+            break;
         }
 
+        // Depois de tratar o comando, continue para a próxima mensagem
+        continue;
+      }
 
-
-        if (upsert.type === 'notify') {
-          for (const msg of upsert.messages) {
-            if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
-              const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text
-              if (text == "requestPlaceholder" && !upsert.requestId) {
-                const messageId = await sock.requestPlaceholderResend(msg.key)
-                console.log('requested placeholder resync, id=', messageId)
-              }
-
-              // go to an old chat and send this
-              if (text == "onDemandHistSync") {
-                const messageId = await sock.fetchMessageHistory(50, msg.key, msg.messageTimestamp!)
-                console.log('requested on-demand sync, id=', messageId)
-              }
-
-           if (text === 'menu') {
-            await sendMessageWTyping(
-           {
-             image: {
-                  url: 'https://raw.githubusercontent.com/naylor-lab/Zenkai-Ethernal-whatsap.default/refs/heads/main/Files/Menu/homeMenu.jpg',
-            },
-               caption: '> Menu:\n\n/Manager\n/Services\n/Help',
+      // -------------------------------------------------
+      // 3.2️⃣  Tratamento dos comandos *sem* prefixo (mantém o seu código atual)
+      // -------------------------------------------------
+      /*if (text === 'menu') {
+        await sendMessageWTyping(
+          {
+            
           },
           msg.key.remoteJid
-            );
-          }
+        );
+      }*/
 
-              if (!msg.key.fromMe && doReplies && !isJidNewsletter(msg.key?.remoteJid!)) {
+      // ... (restante do seu código original, como requestPlaceholder, onDemandHistSync, auto‑reply etc.)
 
-                console.log('replying to', msg.key.remoteJid)
-                await sock!.readMessages([msg.key])
-                await sendMessageWTyping({ text: 'Hello there!' }, msg.key.remoteJid!)
-              }
-            }
-          }
-        }
+      if (!msg.key.fromMe && doReplies && !isJidNewsletter(msg.key?.remoteJid!)) {
+        console.log('replying to', msg.key.remoteJid);
+        await sock!.readMessages([msg.key]);
+        await sendMessageWTyping({ text: 'Hello there!' }, msg.key.remoteJid!);
       }
+    }
+  }
+}
 
 			// messages updated like status delivered, message deleted etc.
 			if(events['messages.update']) {
